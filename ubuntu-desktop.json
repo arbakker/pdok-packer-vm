@@ -1,0 +1,98 @@
+{
+  "_comment1": "NAME=pdok-ubuntu-19.10 UBUNTU_CODENAME=eoan packer build -only=qemu ubuntu-desktop.json",
+  "_comment2": "NAME=pdok-ubuntu-18.04 UBUNTU_CODENAME=bionic packer build -only=qemu ubuntu-desktop.json",
+  "variables": {
+    "name": "{{ env `NAME` }}",
+    "packer_images_output_dir": "{{ env `PACKER_IMAGES_OUTPUT_DIR` }}",
+    "cpus": "2",
+    "memory": "4096",
+    "video_memory": "64",
+    "ubuntu_codename": "{{ env `UBUNTU_CODENAME` }}",
+    "ubuntu_mirror": "http://archive.ubuntu.com/ubuntu/dists/",
+    "ssh_username": "vagrant",
+    "ssh_password": "vagrant",
+    "preseed_file_name": "preseed.cfg",
+    "disk_size": "51200",
+    "headless": "false",
+    "sha256": "{{ env `SHA256` }}"
+  },
+  "builders": [
+    {
+      "vm_name": "{{ user `name` }}",
+      "type": "virtualbox-iso",
+      "guest_os_type": "Ubuntu_64",
+      "iso_checksum_type": "sha256",
+      "iso_checksum": "{{ user `sha256` }}",
+      "iso_urls": [
+        "{{ user `ubuntu_mirror` }}{{ user `ubuntu_codename` }}/main/installer-amd64/current/images/netboot/mini.iso"
+      ],
+      "ssh_username": "{{ user `ssh_username` }}",
+      "ssh_password": "{{ user `ssh_password` }}",
+      "ssh_wait_timeout": "60m",
+      "headless": "{{ user `headless` }}",
+      "output_directory": "{{ user `name` }}-virtualbox-iso",
+      "shutdown_command": "echo 'vagrant' | sudo -S shutdown -P now",
+      "hard_drive_interface": "sata",
+      "disk_size": "{{ user `disk_size` }}",
+      "format": "ova",
+      "vboxmanage": [
+        [
+          "modifyvm",
+          "{{ .Name }}",
+          "--cpus",
+          "{{ user `cpus` }}"
+        ],
+        [
+          "modifyvm",
+          "{{ .Name }}",
+          "--memory",
+          "{{ user `memory` }}"
+        ],
+        [
+          "modifyvm",
+          "{{ .Name }}",
+          "--graphicscontroller",
+          "vboxsvga"
+        ],
+        [
+          "modifyvm",
+          "{{ .Name }}",
+          "--audiocontroller",
+          "hda"
+        ],
+        [
+          "modifyvm",
+          "{{ .Name }}",
+          "--vram",
+          "{{ user `video_memory` }}"
+        ]
+      ],
+      "boot_wait": "5s",
+      "boot_command": [
+        "<tab>",
+        "url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/ubuntu-desktop/{{ user `preseed_file_name` }} ",
+        "auto=true ",
+        "net.ifnames=0 ",
+        "hostname=localhost ",
+        "<enter>"
+      ],
+      "http_directory": "http"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "execute_command": "echo 'vagrant' | {{ .Vars }} sudo -S -E bash -x '{{ .Path }}'",
+      "scripts": [
+        "scripts/ubuntu/update.sh",
+        "scripts/ubuntu/disable_apt-daily.sh",
+        "scripts/ubuntu/spice-vdagent.sh",
+        "scripts/ubuntu/virtualbox-guest-x11.sh",
+        "scripts/linux-common/vagrant.sh",
+        "scripts/linux-common/cleanup.sh"
+      ]
+    }
+  ],
+  "post-processors": [
+  ]
+}
